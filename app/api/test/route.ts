@@ -2,7 +2,7 @@ import { mistral } from "@ai-sdk/mistral"
 import { generateText } from "ai"
 
 // Set up environment variable for Mistral API key
-process.env.MISTRAL_API_KEY = "siodUbXAHdYGqDHMJ9tle6oQ9wLB3Ljq"
+process.env.MISTRAL_API_KEY = "38gyEjVqqS2HY8huB90OJEqeBIFqXzAh"
 
 export async function GET() {
   try {
