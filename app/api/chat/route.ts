@@ -147,114 +147,120 @@ personalization, not a replacement for professional mental health treatment. You
 therapeutic guidance while encouraging appropriate professional intervention when clinical needs exceed AI capabilities.**`
 
 export async function POST(req: Request) {
-    try {
-      const { messages } = await req.json();
+  try {
+    const { messages } = await req.json()
 
-      if (!messages || !Array.isArray(messages)) {
-        return new Response(JSON.stringify({ error: "Invalid messages format" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
-      const headersList = headers();
-      const userIP =
-        headersList.get("x-forwarded-for") ||
-        headersList.get("x-real-ip") ||
-        headersList.get("cf-connecting-ip") ||
-        "unknown";
-      const userAgent = headersList.get("user-agent") || "unknown";
-      const sessionId = Buffer.from(`${userIP}-${Date.now()}`).toString("base64").slice(0, 16);
-
-      console.log("🔍 Request Info:", {
-        userIP,
-        sessionId,
-        messageCount: messages.length,
-        timestamp: new Date().toISOString(),
-      });
-
-      let aiResultText = "No response";
-
-      // 🔄 Call Mistral + extract the text result
-      const aiResult = await generateText({
-        model: mistral("mistral-small-latest", { apiKey }),
-        system: SYSTEM_PROMPT,
-        messages,
-        temperature: 0.7,
-        maxTokens: 300,
-      });
-
-      aiResultText = aiResult.text;
-
-      // ✅ Store to database (including AI response)
-      try {
-        if (process.env.DATABASE_URL) {
-          console.log("📊 Attempting database storage...");
-          const { neon } = await import("@neondatabase/serverless");
-          const sql = neon(process.env.DATABASE_URL);
-
-          await sql`
-            CREATE TABLE IF NOT EXISTS conversations (
-              id SERIAL PRIMARY KEY,
-              session_id VARCHAR(50) NOT NULL,
-              user_ip VARCHAR(45),
-              user_agent TEXT,
-              messages JSONB NOT NULL,
-              response TEXT,
-              timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-          `;
-
-          const result = await sql`
-            INSERT INTO conversations (session_id, user_ip, user_agent, messages, response, timestamp)
-            VALUES (${sessionId}, ${userIP}, ${userAgent}, ${JSON.stringify(messages)}, ${aiResultText}, ${new Date().toISOString()})
-            RETURNING id
-          `;
-
-          console.log("✅ Database storage successful:", result[0]?.id);
-        } else {
-          console.warn("⚠️ DATABASE_URL not found in environment variables");
-        }
-      } catch (dbError) {
-        console.error("❌ Database storage failed:", {
-          error: dbError instanceof Error ? dbError.message : dbError,
-          stack: dbError instanceof Error ? dbError.stack : undefined,
-          databaseUrl: process.env.DATABASE_URL ? "Present" : "Missing",
-        });
-      }
-
-      // 🔁 Stream response back to frontend
-      const streamed = await streamText({
-        model: mistral("mistral-small-latest", { apiKey }),
-        system: SYSTEM_PROMPT,
-        messages,
-        temperature: 0.7,
-        maxTokens: 300,
-      });
-
-      return streamed.toDataStreamResponse({
-        getErrorMessage: (error) => {
-          console.error("Stream error:", error);
-          return error instanceof Error ? error.message : "An error occurred while processing your request.";
-        },
-      });
-
-    } catch (error) {
-      console.error("❌ API Route Error:", {
-        error: error instanceof Error ? error.message : error,
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-
-      return new Response(
-        JSON.stringify({
-          error: "Failed to process request",
-          details: error instanceof Error ? error.message : "Unknown error",
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+    if (!messages || !Array.isArray(messages)) {
+      return new Response(JSON.stringify({ error: "Invalid messages format" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      })
     }
+
+    const headersList = headers()
+    const userIP =
+      headersList.get("x-forwarded-for") ||
+      headersList.get("x-real-ip") ||
+      headersList.get("cf-connecting-ip") ||
+      "unknown"
+    const userAgent = headersList.get("user-agent") || "unknown"
+    const sessionId = Buffer.from(`${userIP}-${Date.now()}`).toString("base64").slice(0, 16)
+
+    console.log("🔍 Request Info:", {
+      userIP,
+      sessionId,
+      messageCount: messages.length,
+      timestamp: new Date().toISOString(),
+    })
+    let aiResultText = "No response";
+    const aiResult = await generateText({
+        model: mistral("mistral-small-latest", { apiKey }),
+        system: SYSTEM_PROMPT,
+        messages,
+        temperature: 0.7,
+        maxTokens: 300,
+      });
+      aiResultText = aiResult.text;
+     // Enhanced database storage with better error handling
+     let dbStorageSuccess = false
+     try {
+        if (process.env.DATABASE_URL) {
+        console.log("📊 Attempting database storage...")
+        const { neon } = await import("@neondatabase/serverless")
+        const sql = neon(process.env.DATABASE_URL)
+
+        // First, try to create table if it doesn't exist
+        await sql`
+          CREATE TABLE IF NOT EXISTS conversations (
+            id SERIAL PRIMARY KEY,
+            session_id VARCHAR(50) NOT NULL,
+            user_ip VARCHAR(45),
+            user_agent TEXT,
+            messages JSONB NOT NULL,
+            response TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `
+
+        // Insert the conversation
+        const result = await sql`
+          INSERT INTO conversations (session_id, user_ip, user_agent, messages, timestamp)
+          VALUES (${sessionId}, ${userIP}, ${userAgent}, ${JSON.stringify(messages)},${aiResultText}, ${new Date().toISOString()})
+          RETURNING id
+        `
+
+        console.log("✅ Database storage successful:", result[0]?.id)
+        dbStorageSuccess = true
+      } else {
+        console.warn("⚠️ DATABASE_URL not found in environment variables")
+      }
+    } catch (dbError) {
+      console.error("❌ Database storage failed:", {
+        error: dbError instanceof Error ? dbError.message : dbError,
+        stack: dbError instanceof Error ? dbError.stack : undefined,
+        databaseUrl: process.env.DATABASE_URL ? "Present" : "Missing",
+      })
+    }
+
+    // Verify API key is set
+    if (!process.env.MISTRAL_API_KEY) {
+      throw new Error("Mistral API key is not configured")
+    }
+
+    console.log("🤖 Calling Mistral API...")
+    // Use the model with environment variable
+    const result = streamText({
+      model: mistral("mistral-small-latest", {apiKey,}),
+      system: SYSTEM_PROMPT,
+      messages,
+      temperature: 0.7,
+      maxTokens: 300,
+    })
+    const assistantResponse = aiResult.text;
+    console.log("✅ Mistral API call initiated successfully")
+
+    return result.toDataStreamResponse({
+      getErrorMessage: (error) => {
+        console.error("Stream error:", error)
+        return error instanceof Error ? error.message : "An error occurred while processing your request."
+      },
+    })
+  } catch (error) {
+    console.error("❌ API Route Error:", {
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined,
+    })
+
+    return new Response(
+      JSON.stringify({
+        error: "Failed to process request",
+        details: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    )
+  }
 }
