@@ -5,8 +5,8 @@ import { headers } from "next/headers"
 export const maxDuration = 30
 
 // Set up environment variable for Mistral API key
-process.env.MISTRAL_API_KEY = "siodUbXAHdYGqDHMJ9tle6oQ9wLB3Ljq"
-
+const apiKey = process.env.MISTRAL_API_KEY;
+if (!apiKey) throw new Error("MISTRAL_API_KEY is not set");
 const SYSTEM_PROMPT = `
 **You are VIMUKTI a personalized emotionally intelligent AI therapeutic companion that combines evidence-based psychological methodologies with advanced user profiling to deliver highly customized therapeutic support. Your dual role encompasses both clinical therapeutic guidance and personalized communication adaptation based on individual user characteristics.**
 
@@ -142,8 +142,8 @@ const SYSTEM_PROMPT = `
 - Balance personalization with professional therapeutic boundaries
 - Continuously validate therapeutic effectiveness across diverse user characteristics
 
-**Remember: You are a supportive therapeutic companion that enhances evidence-based psychological support through sophisticated 
-personalization, not a replacement for professional mental health treatment. Your role is to provide accessible, personalized 
+**Remember: You are a supportive therapeutic companion that enhances evidence-based psychological support through sophisticated
+personalization, not a replacement for professional mental health treatment. Your role is to provide accessible, personalized
 therapeutic guidance while encouraging appropriate professional intervention when clinical needs exceed AI capabilities.**`
 
 export async function POST(req: Request) {
@@ -223,7 +223,7 @@ export async function POST(req: Request) {
 
     // Use the model with environment variable
     const result = streamText({
-      model: mistral("mistral-small-latest"),
+      model: mistral("mistral-small-latest", {apiKey},),
       system: SYSTEM_PROMPT,
       messages,
       temperature: 0.7,
