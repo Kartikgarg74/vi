@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   user_ip VARCHAR(45),
   user_agent TEXT,
   messages JSONB NOT NULL,
+  response TEXT,
   timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

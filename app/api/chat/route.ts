@@ -205,7 +205,7 @@ export async function POST(req: Request) {
 
         // Insert the conversation
         const result = await sql`
-          INSERT INTO conversations (session_id, user_ip, user_agent, messages, timestamp)
+          INSERT INTO conversations (session_id, user_ip, user_agent, messages, response, timestamp)
           VALUES (${sessionId}, ${userIP}, ${userAgent}, ${JSON.stringify(messages)},${aiResultText}, ${new Date().toISOString()})
           RETURNING id
         `
