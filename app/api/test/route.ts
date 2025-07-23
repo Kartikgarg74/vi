@@ -2,13 +2,14 @@ import { mistral } from "@ai-sdk/mistral"
 import { generateText } from "ai"
 
 // Set up environment variable for Mistral API key
-process.env.MISTRAL_API_KEY = "38gyEjVqqS2HY8huB90OJEqeBIFqXzAh"
+const apiKey = process.env.MISTRAL_API_KEY;
+if (!apiKey) throw new Error("MISTRAL_API_KEY is not set");
 
 export async function GET() {
   try {
     // Simple test to verify API key works
     const { text } = await generateText({
-      model: mistral("mistral-small-latest"),
+      model: mistral("mistral-small-latest", {apiKey,}),
       prompt: "Say hello",
       maxTokens: 10,
     })
