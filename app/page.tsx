@@ -11,6 +11,7 @@ import { Send, AlertCircle } from "lucide-react"
 
 export default function EmotionalWellnessChatbot() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
     api: "/api/chat",
@@ -27,6 +28,10 @@ export default function EmotionalWellnessChatbot() {
     onFinish: (message) => {
       console.log("Message completed:", message)
       setErrorMessage(null) // Clear error on successful completion
+      // Keep input focused after message is sent
+      setTimeout(() => {
+        inputRef.current?.focus()
+      }, 100)
     },
   })
 
@@ -56,7 +61,17 @@ export default function EmotionalWellnessChatbot() {
 
     setErrorMessage(null)
     handleSubmit(e)
+
+    // Keep input focused after sending message
+    setTimeout(() => {
+      inputRef.current?.focus()
+    }, 50)
   }
+
+  // Auto-focus input on component mount
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-25 via-yellow-25 to-orange-25">
@@ -152,11 +167,13 @@ export default function EmotionalWellnessChatbot() {
             <div className="border-t border-gray-200 p-6">
               <form onSubmit={handleFormSubmit} className="flex gap-3">
                 <Input
+                  ref={inputRef}
                   value={input}
                   onChange={handleInputChange}
                   placeholder="Share what's on your mind..."
                   className="flex-1 border-amber-200 focus:border-amber-300 focus:ring-amber-200 rounded-full px-6 py-3 text-lg bg-white/80"
                   disabled={isLoading}
+                  autoFocus
                 />
                 <Button
                   type="submit"
